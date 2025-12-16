@@ -60,13 +60,25 @@ router.get('/balance', adminAuth, async (req, res) => {
     const { provider, account } = getStarknetAccount();
     const strkContract = new Contract(ERC20_ABI, process.env.STRK_TOKEN_ADDRESS, provider);
     
-    const balance = await strkContract.balanceOf(account.address);
-    const balanceInStrk = Number(balance) / 1e18;
+    const balanceResult = await strkContract.balanceOf(account.address);
+    // Handle Uint256 response (can be object with low/high or BigInt)
+    let balanceBigInt;
+    if (typeof balanceResult === 'bigint') {
+      balanceBigInt = balanceResult;
+    } else if (balanceResult.balance) {
+      balanceBigInt = BigInt(balanceResult.balance.toString());
+    } else if (balanceResult.low !== undefined) {
+      balanceBigInt = BigInt(balanceResult.low) + (BigInt(balanceResult.high) << 128n);
+    } else {
+      balanceBigInt = BigInt(balanceResult.toString());
+    }
+    
+    const balanceInStrk = Number(balanceBigInt) / 1e18;
 
     res.json({
       address: account.address,
       balance: balanceInStrk.toFixed(4),
-      raw: balance.toString()
+      raw: balanceBigInt.toString()
     });
   } catch (error) {
     console.error('Balance check error:', error);
