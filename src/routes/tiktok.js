@@ -106,4 +106,63 @@ router.delete('/session/:sessionId', (req, res) => {
   res.json({ success: true });
 });
 
+// Get user's videos
+router.get('/videos/:sessionId', async (req, res) => {
+  try {
+    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const { cursor } = req.query;
+    const params = {
+      fields: 'id,title,video_description,duration,cover_image_url,share_url,create_time,like_count,comment_count,share_count,view_count'
+    };
+    
+    if (cursor) {
+      params.cursor = cursor;
+    }
+
+    const videosResponse = await axios.post(
+      'https://open.tiktokapis.com/v2/video/list/',
+      { max_count: 20 },
+      {
+        params,
+        headers: { 
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const data = videosResponse.data.data || {};
+    const videos = data.videos || [];
+    
+    res.json({
+      videos: videos.map(v => ({
+        id: v.id,
+        title: v.title || v.video_description || 'Sans titre',
+        description: v.video_description || '',
+        duration: v.duration,
+        coverUrl: v.cover_image_url,
+        shareUrl: v.share_url,
+        createTime: v.create_time,
+        stats: {
+          views: v.view_count || 0,
+          likes: v.like_count || 0,
+          comments: v.comment_count || 0,
+          shares: v.share_count || 0
+        }
+      })),
+      cursor: data.cursor,
+      hasMore: data.has_more
+    });
+
+  } catch (error) {
+    console.error('Get videos error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch videos', details: error.response?.data });
+  }
+});
+
 module.exports = router;
