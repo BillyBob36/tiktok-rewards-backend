@@ -42,7 +42,10 @@ const ERC20_ABI = [
 
 // Initialize Starknet provider and account
 function getStarknetAccount() {
-  const provider = new RpcProvider({ nodeUrl: process.env.STARKNET_RPC_URL });
+  const provider = new RpcProvider({ 
+    nodeUrl: process.env.STARKNET_RPC_URL,
+    specVersion: '0.7.1'
+  });
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
