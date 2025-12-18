@@ -120,7 +120,8 @@ router.post('/', adminAuth, async (req, res) => {
         // resourceBounds for V3 transactions - generous limits for a simple transfer
         const resourceBounds = {
           l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }, // 10000 gas, 100 gwei
-          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' }
+          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
+          l1_data_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' } // Required by Alchemy
         };
         
         const { transaction_hash } = await account.execute(
