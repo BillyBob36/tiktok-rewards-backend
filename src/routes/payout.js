@@ -35,18 +35,32 @@ const ERC20_ABI = [
 
 // Initialize Starknet provider and account
 function getStarknetAccount() {
-  // Use Alchemy RPC v0_9 (set STARKNET_RPC_URL in environment)
-  if (!process.env.STARKNET_RPC_URL) {
+  // Validate required environment variables
+  const rpcUrl = process.env.STARKNET_RPC_URL;
+  const adminAddress = process.env.STARKNET_ADMIN_ADDRESS;
+  const adminPrivateKey = process.env.STARKNET_ADMIN_PRIVATE_KEY;
+  
+  if (!rpcUrl) {
     throw new Error('STARKNET_RPC_URL environment variable is required');
   }
+  if (!adminAddress) {
+    throw new Error('STARKNET_ADMIN_ADDRESS environment variable is required');
+  }
+  if (!adminPrivateKey) {
+    throw new Error('STARKNET_ADMIN_PRIVATE_KEY environment variable is required');
+  }
+  
+  console.log('Initializing Starknet with RPC:', rpcUrl);
+  console.log('Admin address:', adminAddress);
+  
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL
+    nodeUrl: rpcUrl
   });
   // starknet.js v9 handles V3 transactions automatically
   const account = new Account(
     provider,
-    process.env.STARKNET_ADMIN_ADDRESS,
-    process.env.STARKNET_ADMIN_PRIVATE_KEY
+    adminAddress,
+    adminPrivateKey
   );
   return { provider, account };
 }
