@@ -40,16 +40,13 @@ function getStarknetAccount() {
     throw new Error('STARKNET_RPC_URL environment variable is required');
   }
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL,
-    specVersion: '0.9.1' // Use RPC spec v0.9 for full V3 transaction support
+    nodeUrl: process.env.STARKNET_RPC_URL
   });
-  // Force V3 transactions (required for Starknet Sepolia)
+  // starknet.js v9 handles V3 transactions automatically
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
-    process.env.STARKNET_ADMIN_PRIVATE_KEY,
-    '1', // cairoVersion 1 for Argent X
-    constants.TRANSACTION_VERSION.V3
+    process.env.STARKNET_ADMIN_PRIVATE_KEY
   );
   return { provider, account };
 }
@@ -114,34 +111,15 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
-        const nonce = await provider.getNonceForAddress(account.address, 'latest');
-        
-        // Execute transfer with fixed fees to skip fee estimation (which uses 'pending')
-        // resourceBounds for V3 transactions - generous limits for a simple transfer
-        // l1_data_gas is required by RPC v0.9
-        const resourceBounds = {
-          l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }, // 10000 gas, 100 gwei
-          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
-          l1_data_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' } // Required by RPC v0.9
-        };
-        
-        const { transaction_hash } = await account.execute(
-          {
-            contractAddress: process.env.STRK_TOKEN_ADDRESS,
-            entrypoint: 'transfer',
-            calldata: CallData.compile({
-              recipient: submission.wallet_address,
-              amount: amountUint256
-            })
-          },
-          undefined,
-          { 
-            nonce,
-            resourceBounds,
-            skipValidate: true
-          }
-        );
+        // Execute transfer - starknet.js v9 handles V3 transactions and fees automatically
+        const { transaction_hash } = await account.execute({
+          contractAddress: process.env.STRK_TOKEN_ADDRESS,
+          entrypoint: 'transfer',
+          calldata: CallData.compile({
+            recipient: submission.wallet_address,
+            amount: amountUint256
+          })
+        });
 
         // Wait for transaction
         await provider.waitForTransaction(transaction_hash);
