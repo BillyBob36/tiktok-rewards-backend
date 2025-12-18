@@ -43,17 +43,17 @@ function getStarknetAccount() {
     throw new Error('Missing required Starknet environment variables');
   }
   
+  // starknet.js v8 with RPC spec 0.8
   const provider = new RpcProvider({ 
-    nodeUrl: rpcUrl
+    nodeUrl: rpcUrl,
+    specVersion: '0.8'
   });
   
-  // Use V3 transactions for Starknet Sepolia
+  // starknet.js v8 handles V3 transactions automatically
   const account = new Account(
     provider,
     adminAddress,
-    adminPrivateKey,
-    '1', // cairoVersion
-    constants.TRANSACTION_VERSION.V3
+    adminPrivateKey
   );
   return { provider, account };
 }
@@ -118,25 +118,15 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Fixed resourceBounds with l1_data_gas (required by Lava RPC)
-        const resourceBounds = {
-          l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x5F5E100' },
-          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
-          l1_data_gas: { max_amount: '0x100', max_price_per_unit: '0x5F5E100' }
-        };
-        
-        const { transaction_hash } = await account.execute(
-          {
-            contractAddress: process.env.STRK_TOKEN_ADDRESS,
-            entrypoint: 'transfer',
-            calldata: CallData.compile({
-              recipient: submission.wallet_address,
-              amount: amountUint256
-            })
-          },
-          undefined,
-          { resourceBounds, skipValidate: true }
-        );
+        // starknet.js v8 handles V3 transactions and fees automatically
+        const { transaction_hash } = await account.execute({
+          contractAddress: process.env.STRK_TOKEN_ADDRESS,
+          entrypoint: 'transfer',
+          calldata: CallData.compile({
+            recipient: submission.wallet_address,
+            amount: amountUint256
+          })
+        });
 
         // Wait for transaction
         await provider.waitForTransaction(transaction_hash);
