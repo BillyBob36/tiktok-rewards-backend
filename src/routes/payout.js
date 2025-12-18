@@ -33,10 +33,13 @@ const ERC20_ABI = [
   }
 ];
 
+// Default Starknet Sepolia RPC (BlastAPI - recommended in starknet.js docs)
+const DEFAULT_RPC = 'https://starknet-sepolia.public.blastapi.io/rpc/v0_7';
+
 // Initialize Starknet provider and account
 function getStarknetAccount() {
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL
+    nodeUrl: process.env.STARKNET_RPC_URL || DEFAULT_RPC
   });
   const account = new Account(
     provider,
