@@ -119,9 +119,11 @@ router.post('/', adminAuth, async (req, res) => {
         
         // Execute transfer with fixed fees to skip fee estimation (which uses 'pending')
         // resourceBounds for V3 transactions - generous limits for a simple transfer
+        // l1_data_gas is required by RPC v0.9
         const resourceBounds = {
           l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }, // 10000 gas, 100 gwei
-          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' }
+          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
+          l1_data_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' } // Required by RPC v0.9
         };
         
         const { transaction_hash } = await account.execute(
