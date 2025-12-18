@@ -42,11 +42,13 @@ function getStarknetAccount() {
   const provider = new RpcProvider({ 
     nodeUrl: process.env.STARKNET_RPC_URL
   });
+  // Force V3 transactions (required for Starknet Sepolia)
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
     process.env.STARKNET_ADMIN_PRIVATE_KEY,
-    '1' // cairoVersion 1 for Argent X
+    '1', // cairoVersion 1 for Argent X
+    constants.TRANSACTION_VERSION.V3
   );
   return { provider, account };
 }
