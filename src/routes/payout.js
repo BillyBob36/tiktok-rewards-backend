@@ -1,5 +1,5 @@
 const express = require('express');
-const { RpcProvider, Account, Contract, uint256, CallData, stark, hash } = require('starknet');
+const { RpcProvider, Account, Contract, uint256, CallData, stark, hash, constants } = require('starknet');
 const db = require('../db');
 
 const router = express.Router();
@@ -33,13 +33,11 @@ const ERC20_ABI = [
   }
 ];
 
-// Default Starknet Sepolia RPC (BlastAPI - recommended in starknet.js docs)
-const DEFAULT_RPC = 'https://starknet-sepolia.public.blastapi.io/rpc/v0_7';
-
 // Initialize Starknet provider and account
 function getStarknetAccount() {
+  // Use starknet.js official Sepolia network constant
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL || DEFAULT_RPC
+    nodeUrl: constants.NetworkName.SN_SEPOLIA
   });
   const account = new Account(
     provider,
