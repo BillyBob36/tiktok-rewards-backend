@@ -44,7 +44,8 @@ const ERC20_ABI = [
 function getStarknetAccount() {
   const provider = new RpcProvider({ 
     nodeUrl: process.env.STARKNET_RPC_URL,
-    specVersion: '0.7.1'
+    specVersion: '0.7.1',
+    default_block_identifier: 'latest' // Use 'latest' instead of 'pending' for Alchemy compatibility
   });
   // Use Account with V3 transaction support (STRK fee token)
   const account = new Account(
