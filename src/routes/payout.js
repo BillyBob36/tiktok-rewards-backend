@@ -1,5 +1,5 @@
 const express = require('express');
-const { RpcProvider, Account, Contract, uint256, CallData } = require('starknet');
+const { RpcProvider, Account, Contract, uint256, CallData, constants } = require('starknet');
 const db = require('../db');
 
 const router = express.Router();
@@ -46,10 +46,13 @@ function getStarknetAccount() {
     nodeUrl: process.env.STARKNET_RPC_URL,
     specVersion: '0.7.1'
   });
+  // Use Account with V3 transaction support (STRK fee token)
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
-    process.env.STARKNET_ADMIN_PRIVATE_KEY
+    process.env.STARKNET_ADMIN_PRIVATE_KEY,
+    undefined, // cairoVersion
+    constants.TRANSACTION_VERSION.V3 // Use V3 transactions
   );
   return { provider, account };
 }
