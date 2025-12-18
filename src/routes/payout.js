@@ -1,5 +1,5 @@
 const express = require('express');
-const { RpcProvider, Account, Contract, uint256, CallData, constants } = require('starknet');
+const { RpcProvider, Account, Contract, uint256, CallData, stark, hash } = require('starknet');
 const db = require('../db');
 
 const router = express.Router();
@@ -30,13 +30,6 @@ const ERC20_ABI = [
     inputs: [{ name: 'account', type: 'felt' }],
     outputs: [{ name: 'balance', type: 'Uint256' }],
     stateMutability: 'view'
-  },
-  {
-    name: 'decimals',
-    type: 'function',
-    inputs: [],
-    outputs: [{ name: 'decimals', type: 'felt' }],
-    stateMutability: 'view'
   }
 ];
 
@@ -45,7 +38,6 @@ function getStarknetAccount() {
   const provider = new RpcProvider({ 
     nodeUrl: process.env.STARKNET_RPC_URL
   });
-  // Use Account with V3 transaction support (STRK fee token)
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
@@ -59,21 +51,18 @@ function getStarknetAccount() {
 router.get('/balance', adminAuth, async (req, res) => {
   try {
     const { provider, account } = getStarknetAccount();
-    const strkContract = new Contract(ERC20_ABI, process.env.STRK_TOKEN_ADDRESS, provider);
     
-    const balanceResult = await strkContract.call('balanceOf', [account.address], { blockIdentifier: 'latest' });
-    // Handle Uint256 response (can be object with low/high or BigInt)
-    let balanceBigInt;
-    if (typeof balanceResult === 'bigint') {
-      balanceBigInt = balanceResult;
-    } else if (balanceResult.balance) {
-      balanceBigInt = BigInt(balanceResult.balance.toString());
-    } else if (balanceResult.low !== undefined) {
-      balanceBigInt = BigInt(balanceResult.low) + (BigInt(balanceResult.high) << 128n);
-    } else {
-      balanceBigInt = BigInt(balanceResult.toString());
-    }
+    // Direct RPC call to avoid 'pending' block issue
+    const result = await provider.callContract({
+      contractAddress: process.env.STRK_TOKEN_ADDRESS,
+      entrypoint: 'balanceOf',
+      calldata: CallData.compile({ account: account.address })
+    }, 'latest');
     
+    // Parse Uint256 result (low, high)
+    const low = BigInt(result[0]);
+    const high = BigInt(result[1] || '0');
+    const balanceBigInt = low + (high << 128n);
     const balanceInStrk = Number(balanceBigInt) / 1e18;
 
     res.json({
@@ -83,7 +72,7 @@ router.get('/balance', adminAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Balance check error:', error);
-    res.status(500).json({ error: 'Failed to check balance' });
+    res.status(500).json({ error: 'Failed to check balance: ' + error.message });
   }
 });
 
@@ -110,9 +99,6 @@ router.post('/', adminAuth, async (req, res) => {
     }
 
     const { provider, account } = getStarknetAccount();
-    const strkContract = new Contract(ERC20_ABI, process.env.STRK_TOKEN_ADDRESS, provider);
-    strkContract.connect(account);
-
     const results = [];
 
     for (const submission of submissions) {
@@ -121,10 +107,13 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
+        // Get nonce with 'latest' block
         const nonce = await provider.getNonceForAddress(account.address, 'latest');
         
-        // Execute transfer with explicit nonce
+        // Execute transfer with skipFeeEstimation and fixed maxFee
+        // Using a generous max fee of 0.01 STRK for the transfer
+        const maxFee = BigInt('10000000000000000'); // 0.01 STRK
+        
         const { transaction_hash } = await account.execute(
           {
             contractAddress: process.env.STRK_TOKEN_ADDRESS,
@@ -134,8 +123,12 @@ router.post('/', adminAuth, async (req, res) => {
               amount: amountUint256
             })
           },
-          undefined, // abi
-          { nonce } // options with nonce
+          undefined,
+          { 
+            nonce,
+            maxFee,
+            skipValidate: true
+          }
         );
 
         // Wait for transaction
