@@ -121,11 +121,11 @@ router.post('/', adminAuth, async (req, res) => {
         // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
         const nonce = await provider.getNonceForAddress(account.address, 'latest');
         
-        // resourceBounds for V3 transactions with l1_data_gas (required by RPC v0.9)
+        // resourceBounds for V3 transactions - increased values for Sepolia
         const resourceBounds = {
-          l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' },
-          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
-          l1_data_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }
+          l1_gas: { max_amount: '0x186A0', max_price_per_unit: '0x5F5E100' }, // 100000 gas, 100M price
+          l2_gas: { max_amount: '0x2FAF080', max_price_per_unit: '0x5F5E100' }, // 50M gas, 100M price
+          l1_data_gas: { max_amount: '0x186A0', max_price_per_unit: '0x5F5E100' } // 100000 gas, 100M price
         };
         
         const { transaction_hash } = await account.execute(
