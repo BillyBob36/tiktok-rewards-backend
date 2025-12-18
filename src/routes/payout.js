@@ -118,28 +118,15 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
-        const nonce = await provider.getNonceForAddress(account.address, 'latest');
-        
-        // resourceBounds for V3 transactions - increased values for Sepolia
-        const resourceBounds = {
-          l1_gas: { max_amount: '0x186A0', max_price_per_unit: '0x5F5E100' }, // 100000 gas, 100M price
-          l2_gas: { max_amount: '0x2FAF080', max_price_per_unit: '0x5F5E100' }, // 50M gas, 100M price
-          l1_data_gas: { max_amount: '0x186A0', max_price_per_unit: '0x5F5E100' } // 100000 gas, 100M price
-        };
-        
-        const { transaction_hash } = await account.execute(
-          {
-            contractAddress: process.env.STRK_TOKEN_ADDRESS,
-            entrypoint: 'transfer',
-            calldata: CallData.compile({
-              recipient: submission.wallet_address,
-              amount: amountUint256
-            })
-          },
-          undefined,
-          { nonce, resourceBounds }
-        );
+        // Let starknet.js estimate fees automatically (RPC v0_9 supports this)
+        const { transaction_hash } = await account.execute({
+          contractAddress: process.env.STRK_TOKEN_ADDRESS,
+          entrypoint: 'transfer',
+          calldata: CallData.compile({
+            recipient: submission.wallet_address,
+            amount: amountUint256
+          })
+        });
 
         // Wait for transaction
         await provider.waitForTransaction(transaction_hash);
