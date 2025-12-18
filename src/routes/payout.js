@@ -35,12 +35,13 @@ const ERC20_ABI = [
 
 // Initialize Starknet provider and account
 function getStarknetAccount() {
-  // Use Alchemy RPC (set STARKNET_RPC_URL in environment)
+  // Use Alchemy RPC v0_9 (set STARKNET_RPC_URL in environment)
   if (!process.env.STARKNET_RPC_URL) {
     throw new Error('STARKNET_RPC_URL environment variable is required');
   }
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL
+    nodeUrl: process.env.STARKNET_RPC_URL,
+    specVersion: '0.9.1' // Use RPC spec v0.9 for full V3 transaction support
   });
   // Force V3 transactions (required for Starknet Sepolia)
   const account = new Account(
