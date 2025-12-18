@@ -43,17 +43,14 @@ const ERC20_ABI = [
 // Initialize Starknet provider and account
 function getStarknetAccount() {
   const provider = new RpcProvider({ 
-    nodeUrl: process.env.STARKNET_RPC_URL,
-    specVersion: '0.7.1',
-    default_block_identifier: 'latest' // Use 'latest' instead of 'pending' for Alchemy compatibility
+    nodeUrl: process.env.STARKNET_RPC_URL
   });
   // Use Account with V3 transaction support (STRK fee token)
   const account = new Account(
     provider,
     process.env.STARKNET_ADMIN_ADDRESS,
     process.env.STARKNET_ADMIN_PRIVATE_KEY,
-    undefined, // cairoVersion
-    constants.TRANSACTION_VERSION.V3 // Use V3 transactions
+    '1' // cairoVersion 1 for Argent X
   );
   return { provider, account };
 }
@@ -64,7 +61,7 @@ router.get('/balance', adminAuth, async (req, res) => {
     const { provider, account } = getStarknetAccount();
     const strkContract = new Contract(ERC20_ABI, process.env.STRK_TOKEN_ADDRESS, provider);
     
-    const balanceResult = await strkContract.balanceOf(account.address);
+    const balanceResult = await strkContract.call('balanceOf', [account.address], { blockIdentifier: 'latest' });
     // Handle Uint256 response (can be object with low/high or BigInt)
     let balanceBigInt;
     if (typeof balanceResult === 'bigint') {
@@ -124,15 +121,22 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Execute transfer
-        const { transaction_hash } = await account.execute({
-          contractAddress: process.env.STRK_TOKEN_ADDRESS,
-          entrypoint: 'transfer',
-          calldata: CallData.compile({
-            recipient: submission.wallet_address,
-            amount: amountUint256
-          })
-        });
+        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
+        const nonce = await provider.getNonceForAddress(account.address, 'latest');
+        
+        // Execute transfer with explicit nonce
+        const { transaction_hash } = await account.execute(
+          {
+            contractAddress: process.env.STRK_TOKEN_ADDRESS,
+            entrypoint: 'transfer',
+            calldata: CallData.compile({
+              recipient: submission.wallet_address,
+              amount: amountUint256
+            })
+          },
+          undefined, // abi
+          { nonce } // options with nonce
+        );
 
         // Wait for transaction
         await provider.waitForTransaction(transaction_hash);
