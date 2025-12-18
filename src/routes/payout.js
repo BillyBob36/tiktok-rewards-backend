@@ -35,9 +35,12 @@ const ERC20_ABI = [
 
 // Initialize Starknet provider and account
 function getStarknetAccount() {
-  // Use starknet.js official Sepolia network constant
+  // Use Alchemy RPC (set STARKNET_RPC_URL in environment)
+  if (!process.env.STARKNET_RPC_URL) {
+    throw new Error('STARKNET_RPC_URL environment variable is required');
+  }
   const provider = new RpcProvider({ 
-    nodeUrl: constants.NetworkName.SN_SEPOLIA
+    nodeUrl: process.env.STARKNET_RPC_URL
   });
   const account = new Account(
     provider,
@@ -108,12 +111,15 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Get nonce with 'latest' block
+        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
         const nonce = await provider.getNonceForAddress(account.address, 'latest');
         
-        // Execute transfer with skipFeeEstimation and fixed maxFee
-        // Using a generous max fee of 0.01 STRK for the transfer
-        const maxFee = BigInt('10000000000000000'); // 0.01 STRK
+        // Execute transfer with fixed fees to skip fee estimation (which uses 'pending')
+        // resourceBounds for V3 transactions - generous limits for a simple transfer
+        const resourceBounds = {
+          l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }, // 10000 gas, 100 gwei
+          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' }
+        };
         
         const { transaction_hash } = await account.execute(
           {
@@ -127,7 +133,7 @@ router.post('/', adminAuth, async (req, res) => {
           undefined,
           { 
             nonce,
-            maxFee,
+            resourceBounds,
             skipValidate: true
           }
         );
