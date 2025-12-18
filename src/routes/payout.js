@@ -1,5 +1,5 @@
 const express = require('express');
-const { RpcProvider, Account, Contract, uint256, CallData, stark, hash, constants } = require('starknet');
+const { RpcProvider, Account, Contract, uint256, CallData, constants } = require('starknet');
 const db = require('../db');
 
 const router = express.Router();
@@ -35,32 +35,25 @@ const ERC20_ABI = [
 
 // Initialize Starknet provider and account
 function getStarknetAccount() {
-  // Validate required environment variables
   const rpcUrl = process.env.STARKNET_RPC_URL;
   const adminAddress = process.env.STARKNET_ADMIN_ADDRESS;
   const adminPrivateKey = process.env.STARKNET_ADMIN_PRIVATE_KEY;
   
-  if (!rpcUrl) {
-    throw new Error('STARKNET_RPC_URL environment variable is required');
+  if (!rpcUrl || !adminAddress || !adminPrivateKey) {
+    throw new Error('Missing required Starknet environment variables');
   }
-  if (!adminAddress) {
-    throw new Error('STARKNET_ADMIN_ADDRESS environment variable is required');
-  }
-  if (!adminPrivateKey) {
-    throw new Error('STARKNET_ADMIN_PRIVATE_KEY environment variable is required');
-  }
-  
-  console.log('Initializing Starknet with RPC:', rpcUrl);
-  console.log('Admin address:', adminAddress);
   
   const provider = new RpcProvider({ 
     nodeUrl: rpcUrl
   });
-  // starknet.js v9 handles V3 transactions automatically
+  
+  // Use V3 transactions for Starknet Sepolia
   const account = new Account(
     provider,
     adminAddress,
-    adminPrivateKey
+    adminPrivateKey,
+    '1', // cairoVersion
+    constants.TRANSACTION_VERSION.V3
   );
   return { provider, account };
 }
@@ -125,15 +118,28 @@ router.post('/', adminAuth, async (req, res) => {
         const amountInWei = BigInt(Math.floor(parseFloat(submission.reward_amount) * 1e18));
         const amountUint256 = uint256.bnToUint256(amountInWei);
 
-        // Execute transfer - starknet.js v9 handles V3 transactions and fees automatically
-        const { transaction_hash } = await account.execute({
-          contractAddress: process.env.STRK_TOKEN_ADDRESS,
-          entrypoint: 'transfer',
-          calldata: CallData.compile({
-            recipient: submission.wallet_address,
-            amount: amountUint256
-          })
-        });
+        // Get nonce with 'latest' block (Alchemy doesn't support 'pending')
+        const nonce = await provider.getNonceForAddress(account.address, 'latest');
+        
+        // resourceBounds for V3 transactions with l1_data_gas (required by RPC v0.9)
+        const resourceBounds = {
+          l1_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' },
+          l2_gas: { max_amount: '0x0', max_price_per_unit: '0x0' },
+          l1_data_gas: { max_amount: '0x2710', max_price_per_unit: '0x174876e800' }
+        };
+        
+        const { transaction_hash } = await account.execute(
+          {
+            contractAddress: process.env.STRK_TOKEN_ADDRESS,
+            entrypoint: 'transfer',
+            calldata: CallData.compile({
+              recipient: submission.wallet_address,
+              amount: amountUint256
+            })
+          },
+          undefined,
+          { nonce, resourceBounds }
+        );
 
         // Wait for transaction
         await provider.waitForTransaction(transaction_hash);
