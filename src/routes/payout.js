@@ -43,18 +43,17 @@ function getStarknetAccount() {
     throw new Error('Missing required Starknet environment variables');
   }
   
-  // starknet.js v8 with RPC spec 0.8
+  // starknet.js v8 with Lava RPC v0.9
   const provider = new RpcProvider({ 
-    nodeUrl: rpcUrl,
-    specVersion: '0.8'
+    nodeUrl: rpcUrl
   });
   
-  // starknet.js v8 handles V3 transactions automatically
-  const account = new Account(
-    provider,
-    adminAddress,
-    adminPrivateKey
-  );
+  // starknet.js v8 uses object syntax for Account
+  const account = new Account({
+    provider: provider,
+    address: adminAddress,
+    signer: adminPrivateKey
+  });
   return { provider, account };
 }
 
