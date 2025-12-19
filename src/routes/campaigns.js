@@ -77,7 +77,17 @@ router.put('/:id', adminAuth, (req, res) => {
 
 // Delete campaign (admin)
 router.delete('/:id', adminAuth, (req, res) => {
-  db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
+  const campaignId = req.params.id;
+  
+  // Check if there are submissions linked to this campaign
+  const submissions = db.prepare('SELECT COUNT(*) as count FROM submissions WHERE campaign_id = ?').get(campaignId);
+  
+  if (submissions.count > 0) {
+    // Delete associated submissions first
+    db.prepare('DELETE FROM submissions WHERE campaign_id = ?').run(campaignId);
+  }
+  
+  db.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignId);
   res.json({ success: true });
 });
 
