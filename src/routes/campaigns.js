@@ -12,7 +12,7 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// Get active campaign (public)
+// Get active campaign (public) - returns the latest active one
 router.get('/active', (req, res) => {
   const campaign = db.prepare('SELECT * FROM campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1').get();
   
@@ -21,6 +21,12 @@ router.get('/active', (req, res) => {
   }
 
   res.json(campaign);
+});
+
+// Get all active campaigns (public)
+router.get('/active/all', (req, res) => {
+  const campaigns = db.prepare('SELECT * FROM campaigns WHERE is_active = 1 ORDER BY id DESC').all();
+  res.json(campaigns);
 });
 
 // Get all campaigns (admin)

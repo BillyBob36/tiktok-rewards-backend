@@ -39,7 +39,7 @@ function extractVideoId(url) {
 // Submit a video (user)
 router.post('/', async (req, res) => {
   try {
-    const { sessionId, videoUrl, walletAddress } = req.body;
+    const { sessionId, videoUrl, walletAddress, campaignId } = req.body;
 
     // Validate inputs
     if (!sessionId || !videoUrl || !walletAddress) {
@@ -57,10 +57,18 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'Invalid session' });
     }
 
-    // Get active campaign
-    const campaign = db.prepare('SELECT * FROM campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1').get();
-    if (!campaign) {
-      return res.status(400).json({ error: 'No active campaign' });
+    // Get campaign (specific or latest active)
+    let campaign;
+    if (campaignId) {
+      campaign = db.prepare('SELECT * FROM campaigns WHERE id = ? AND is_active = 1').get(campaignId);
+      if (!campaign) {
+        return res.status(400).json({ error: 'Campaign not found or not active' });
+      }
+    } else {
+      campaign = db.prepare('SELECT * FROM campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1').get();
+      if (!campaign) {
+        return res.status(400).json({ error: 'No active campaign' });
+      }
     }
 
     // Extract video ID
