@@ -64,6 +64,11 @@ router.post('/', adminAuth, (req, res) => {
 router.put('/:id', adminAuth, (req, res) => {
   const { name, min_views, min_likes, min_comments, min_shares, reward_amount, max_winners, is_active } = req.body;
 
+  // If activating this campaign, deactivate all others first
+  if (is_active === 1 || is_active === true) {
+    db.prepare('UPDATE campaigns SET is_active = 0 WHERE id != ?').run(req.params.id);
+  }
+
   db.prepare(`
     UPDATE campaigns 
     SET name = COALESCE(?, name),
